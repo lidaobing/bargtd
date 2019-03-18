@@ -83,7 +83,8 @@ class GitlabEngine(Engine):
         entry = self.profile.entry
         project_id = self.profile.project_id
         token = self.profile.token
-        url = "%s/api/v4/projects/%s/issues?private_token=%s&page=%s" % (entry, project_id, token, page)
+        # FIXME: urlencode
+        url = "%s/api/v4/projects/%s/issues?state=opened&private_token=%s&page=%s" % (entry, project_id, token, page)
         response = requests.get(url)
         response.raise_for_status()
         content = response.content
