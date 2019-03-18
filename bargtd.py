@@ -14,7 +14,7 @@ class Config:
 
     def get_current_profile(self):
         if 'current_profile' in self.data:
-            return Profile.from_map([x for x in self.data['profiles'] if x['name'] == self.data['current_profile']])
+            return Profile.from_map([x for x in self.data['profiles'] if x['name'] == self.data['current_profile']][0])
         else:
             return Profile.from_map(self.data['profiles'][0])
 
@@ -28,14 +28,7 @@ class Profile:
     @staticmethod
     def from_map(m):
         res = Profile()
-        if 'engine' in m:
-            res.engine = m['engine']
-        if 'user' in m:
-            res.user = m['user']
-        if 'repo' in m:
-            res.repo = m['repo']
-        if 'auth' in m:
-            res.auth = m['auth']
+        res.__dict__.update(m)
         return res
 
 class Task:
@@ -45,11 +38,7 @@ class Task:
         self.url = url
         self.assignee = assignee
 
-
-class GithubEngine:
-    def __init__(self, profile):
-        self.profile = profile
-
+class Engine:
     def get_all_tasks(self):
         page = 1
         res = []
@@ -60,6 +49,13 @@ class GithubEngine:
             res.extend(tasks)
             page += 1
         return res
+
+    def get_tasks_for_page(self, page):
+        raise NotImplementedError
+
+class GithubEngine(Engine):
+    def __init__(self, profile):
+        self.profile = profile
 
     def get_tasks_for_page(self, page):
         assert self.profile.auth == 'netrc'
@@ -79,11 +75,36 @@ class GithubEngine:
             res.append(Task(j0['number'], j0['title'], j0['html_url'], assignee))
         return res
 
+class GitlabEngine(Engine):
+    def __init__(self, profile):
+        self.profile = profile
+
+    def get_tasks_for_page(self, page):
+        entry = self.profile.entry
+        project_id = self.profile.project_id
+        token = self.profile.token
+        url = "%s/api/v4/projects/%s/issues?private_token=%s&page=%s" % (entry, project_id, token, page)
+        response = requests.get(url)
+        response.raise_for_status()
+        content = response.content
+        j = json.loads(content)
+        res = []
+        for j0 in j:
+            assignee = None
+            if j0['assignee'] is not None:
+                assignee = j0['assignee']
+            res.append(Task(j0['iid'], j0['title'], j0['web_url'], assignee))
+        return res
 
 
 def get_all_tasks(profile):
-    assert profile.engine == 'github'
-    engine = GithubEngine(profile)
+    engine = None
+    if profile.engine == 'github':
+        engine = GithubEngine(profile)
+    elif profile.engine == 'gitlab':
+        engine = GitlabEngine(profile)
+    else:
+        raise Exception("unknown engine: " + profile.engine)
     return engine.get_all_tasks()
 
 def main():
