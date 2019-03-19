@@ -53,6 +53,9 @@ class Engine:
     def get_tasks_for_page(self, page):
         raise NotImplementedError
 
+    def get_create_url(self):
+        raise NotImplementedError
+
 class GithubEngine(Engine):
     def __init__(self, profile):
         self.profile = profile
@@ -74,6 +77,9 @@ class GithubEngine(Engine):
                 assignee = j0['assignee']
             res.append(Task(j0['number'], j0['title'], j0['html_url'], assignee))
         return res
+
+    def get_create_url(self):
+        return "https://github.com/%s/%s/issues/new" % (self.profile.user, self.profile.repo)
 
 class GitlabEngine(Engine):
     def __init__(self, profile):
@@ -97,16 +103,15 @@ class GitlabEngine(Engine):
             res.append(Task(j0['iid'], j0['title'], j0['web_url'], assignee))
         return res
 
+    def get_create_url(self):
+        return "%s/%s/%s/issues/new" % (self.profile.entry, self.profile.user, self.profile.repo)
 
-def get_all_tasks(profile):
-    engine = None
+def get_engine(profile):
     if profile.engine == 'github':
-        engine = GithubEngine(profile)
-    elif profile.engine == 'gitlab':
-        engine = GitlabEngine(profile)
-    else:
-        raise Exception("unknown engine: " + profile.engine)
-    return engine.get_all_tasks()
+        return GithubEngine(profile)
+    if profile.engine == 'gitlab':
+        return GitlabEngine(profile)
+    raise Exception("unknown engine: " + profile.engine)
 
 def main():
     profile = None
@@ -117,7 +122,8 @@ def main():
         profile = config.get_current_profile()
     if profile is None:
         profile = Profile()
-    tasks = get_all_tasks(profile)
+    engine = get_engine(profile)
+    tasks = engine.get_all_tasks()
     assigned_tasks = [x for x in tasks if x.assignee is not None]
     unassigned_tasks = [x for x in tasks if x.assignee is None]
     profiles = []
@@ -126,6 +132,7 @@ def main():
     print('🤹(%d/%d)' % (len(assigned_tasks), len(unassigned_tasks)))
     print('---')
     print('Tools')
+    print('--New Task | href=%s' % engine.get_create_url())
     print('--Refresh | refresh=true')
     print('--Profiles')
     for x in profiles:
