@@ -7,3 +7,4 @@ A GTD Tool on your OS menu bar
 * [ ] support JIRA
 * [ ] support custom query from github
 * [ ] support switch profile from menu
+* [ ] support merge multiple tasklist
