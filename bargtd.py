@@ -9,6 +9,9 @@ class Config:
     def __init__(self, ifile):
         self.data = json.loads(ifile.read())
 
+    def get_profile_by_name(self, name):
+        return Profile.from_map([x for x in self.data['profiles'] if x['name'] == name][0])
+
     def get_profile_names(self):
         return [x['name'] for x in self.data['profiles']]
 
@@ -32,13 +35,17 @@ class Profile:
         return res
 
 class Task:
-    def __init__(self, number, title, url, assignee):
+    def __init__(self, number, title, url, assignee, prefix = ''):
         self.number = number
         self.title = title
         self.url = url
         self.assignee = assignee
+        self.prefix = prefix
 
 class Engine:
+    def __init__(self):
+        self.prefix = ''
+
     def get_all_tasks(self):
         page = 1
         res = []
@@ -56,8 +63,28 @@ class Engine:
     def get_create_url(self):
         raise NotImplementedError
 
+class MergeEngine(Engine):
+    def __init__(self, profile, config):
+        super().__init__()
+        self.profile = profile
+        self.engines = []
+        for x in profile.engines:
+            engine = get_engine(config.get_profile_by_name(x), config)
+            engine.prefix = x
+            self.engines.append(engine)
+
+    def get_create_url(self):
+        pass
+
+    def get_all_tasks(self):
+        tasks = []
+        for x in self.engines:
+            tasks += x.get_all_tasks()
+        return tasks
+
 class GithubEngine(Engine):
     def __init__(self, profile):
+        super().__init__()
         self.profile = profile
 
     def get_tasks_for_page(self, page):
@@ -75,7 +102,7 @@ class GithubEngine(Engine):
             assignee = None
             if j0['assignee'] is not None:
                 assignee = j0['assignee']
-            res.append(Task(j0['number'], j0['title'], j0['html_url'], assignee))
+            res.append(Task(j0['number'], j0['title'], j0['html_url'], assignee, self.prefix))
         return res
 
     def get_create_url(self):
@@ -83,6 +110,7 @@ class GithubEngine(Engine):
 
 class GitlabEngine(Engine):
     def __init__(self, profile):
+        super().__init__()
         self.profile = profile
 
     def get_tasks_for_page(self, page):
@@ -100,17 +128,19 @@ class GitlabEngine(Engine):
             assignee = None
             if j0['assignee'] is not None:
                 assignee = j0['assignee']
-            res.append(Task(j0['iid'], j0['title'], j0['web_url'], assignee))
+            res.append(Task(j0['iid'], j0['title'], j0['web_url'], assignee, self.prefix))
         return res
 
     def get_create_url(self):
         return "%s/%s/%s/issues/new" % (self.profile.entry, self.profile.user, self.profile.repo)
 
-def get_engine(profile):
+def get_engine(profile, config):
     if profile.engine == 'github':
         return GithubEngine(profile)
     if profile.engine == 'gitlab':
         return GitlabEngine(profile)
+    if profile.engine == 'merge':
+        return MergeEngine(profile, config)
     raise Exception("unknown engine: " + profile.engine)
 
 def main():
@@ -122,7 +152,7 @@ def main():
         profile = config.get_current_profile()
     if profile is None:
         profile = Profile()
-    engine = get_engine(profile)
+    engine = get_engine(profile, config)
     tasks = engine.get_all_tasks()
     assigned_tasks = [x for x in tasks if x.assignee is not None]
     unassigned_tasks = [x for x in tasks if x.assignee is None]
@@ -139,10 +169,10 @@ def main():
         print('----%s | refresh=true' % x)
     print('---')
     for x in assigned_tasks:
-        print("#%s: %s | href=%s" % (x.number, x.title, x.url))
+        print("%s#%s: %s | href=%s" % (x.prefix, x.number, x.title, x.url))
     print('---')
     for x in unassigned_tasks:
-        print("#%s: %s | href=%s length=30" % (x.number, x.title, x.url))
+        print("%s#%s: %s | href=%s length=30" % (x.prefix, x.number, x.title, x.url))
 
 if __name__ == '__main__':
     main()
