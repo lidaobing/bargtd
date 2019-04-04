@@ -161,8 +161,8 @@ def main():
         profiles = config.get_profile_names()
     print('🤹(%d/%d)' % (len(assigned_tasks), len(unassigned_tasks)))
     print('---')
+    print('New Task | href=%s' % engine.get_create_url())
     print('Tools')
-    print('--New Task | href=%s' % engine.get_create_url())
     print('--Refresh | refresh=true')
     print('--Profiles')
     for x in profiles:
