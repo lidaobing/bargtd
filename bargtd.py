@@ -93,7 +93,11 @@ class GithubEngine(Engine):
         username, _, password = a.authenticators('api.github.com')
 
         url = "https://api.github.com/repos/%s/%s/issues?page=%s" % (self.profile.user, self.profile.repo, page)
-        response = requests.get(url, auth=(username, password))
+        response = None
+        try:
+            response = requests.get(url, auth=(username, password))
+        except Exception as e:
+            raise Exception("fail to get url %s: %s" % (url, e)) from None
         response.raise_for_status()
         content = response.content
         j = json.loads(content)
@@ -119,7 +123,11 @@ class GitlabEngine(Engine):
         token = self.profile.token
         # FIXME: urlencode
         url = "%s/api/v4/projects/%s/issues?state=opened&private_token=%s&page=%s" % (entry, project_id, token, page)
-        response = requests.get(url)
+        response = None
+        try:
+            response = requests.get(url)
+        except Exception as e:
+            raise Exception("fail to get url %s: %s" % (url, e)) from None
         response.raise_for_status()
         content = response.content
         j = json.loads(content)
