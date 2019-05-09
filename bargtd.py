@@ -4,6 +4,7 @@ import netrc
 import requests
 import json
 import os.path
+import urllib.parse
 
 class Config:
     def __init__(self, ifile):
@@ -121,8 +122,11 @@ class GitlabEngine(Engine):
         entry = self.profile.entry
         project_id = self.profile.project_id
         token = self.profile.token
-        # FIXME: urlencode
-        url = "%s/api/v4/projects/%s/issues?state=opened&private_token=%s&page=%s" % (entry, project_id, token, page)
+        url = "%s/api/v4/projects/%s/issues?%s" % (
+            entry,
+            project_id,
+            urllib.parse.urlencode({'state': 'opened', 'private_token': token, 'page': page})
+        )
         response = None
         try:
             response = requests.get(url)
@@ -142,6 +146,47 @@ class GitlabEngine(Engine):
     def get_create_url(self):
         return "%s/%s/%s/issues/new" % (self.profile.entry, self.profile.user, self.profile.repo)
 
+class JiraEngine(Engine):
+    def __init__(self, profile):
+        super().__init__()
+        self.profile = profile
+
+    def get_tasks_for_page(self, page):
+        host = self.profile.host
+        project = self.profile.project
+        https = self.profile.https
+
+
+        assert self.profile.auth == 'netrc'
+        a = netrc.netrc()
+        username, _, password = a.authenticators(host)
+
+        # FIXME: jql encode
+        url = "%s://%s/rest/api/2/search?%s" % (
+            'https' if https else 'http',
+            host,
+            urllib.parse.urlencode({'jql': 'project='+project, 'startAt': (page-1)*50, 'maxResults':50}))
+        response = None
+        try:
+            response = requests.get(url, auth=(username, password))
+        except Exception as e:
+            raise Exception("fail to get url %s: %s" % (url, e)) from None
+        response.raise_for_status()
+        content = response.content
+        # print repr(content)
+        j = json.loads(content)
+        res = []
+        for j0 in j['issues']:
+            assignee = None
+            if j0['fields']['assignee'] is not None:
+                assignee = j0['fields']['assignee']['key']
+            web_url = '%s://%s/browse/%s' % ('https' if https else 'http', host, j0['key'])
+            res.append(Task(j0['key'], j0['fields']['summary'], web_url, assignee, self.prefix))
+        return res
+
+    def get_create_url(self):
+        return "%s://%s" % ('https' if self.profile.https else 'http', self.profile.host)
+
 def get_engine(profile, config):
     if profile.engine == 'github':
         return GithubEngine(profile)
@@ -149,6 +194,8 @@ def get_engine(profile, config):
         return GitlabEngine(profile)
     if profile.engine == 'merge':
         return MergeEngine(profile, config)
+    if profile.engine == 'jira':
+        return JiraEngine(profile)
     raise Exception("unknown engine: " + profile.engine)
 
 def main():
