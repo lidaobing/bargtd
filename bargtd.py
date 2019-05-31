@@ -155,6 +155,7 @@ class JiraEngine(Engine):
         host = self.profile.host
         project = self.profile.project
         https = self.profile.https
+        me = self.profile.assignee
 
 
         assert self.profile.auth == 'netrc'
@@ -180,6 +181,8 @@ class JiraEngine(Engine):
             assignee = None
             if j0['fields']['assignee'] is not None:
                 assignee = j0['fields']['assignee']['key']
+                if assignee != me:
+                    assignee = None
             web_url = '%s://%s/browse/%s' % ('https' if https else 'http', host, j0['key'])
             res.append(Task(j0['key'], j0['fields']['summary'], web_url, assignee, self.prefix))
         return res
