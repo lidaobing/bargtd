@@ -1,4 +1,4 @@
-#!/use/local/bin/python3
+#!/use/bin/env python
 
 import bargtd
 
