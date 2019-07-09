@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/local/bin/python3
 
 import netrc
 import requests
@@ -166,7 +166,7 @@ class JiraEngine(Engine):
         url = "%s://%s/rest/api/2/search?%s" % (
             'https' if https else 'http',
             host,
-            urllib.parse.urlencode({'jql': 'project='+project, 'startAt': (page-1)*50, 'maxResults':50}))
+            urllib.parse.urlencode({'jql': 'project=%s AND resolution = Unresolved' % project, 'startAt': (page-1)*50, 'maxResults':50}))
         response = None
         try:
             response = requests.get(url, auth=(username, password))
