@@ -6,6 +6,8 @@ import json
 import os.path
 import urllib.parse
 
+# priority: ⬆️🔼⏹🔽⬇️
+
 class Config:
     def __init__(self, ifile):
         self.data = json.loads(ifile.read())
