@@ -1,0 +1,6 @@
+#!/use/local/bin/python3
+
+import bargtd
+
+if __name__ == '__main__':
+    bargtd.main()
